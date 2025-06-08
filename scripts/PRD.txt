@@ -1,0 +1,147 @@
+## Product Requirements Document (PRD)
+
+**Project:** *Image‑Email Signer*
+**Dev → Deploy Flow:** Cursor AI → GitHub → Vercel (Next.js 14 / Edge & Background Functions)
+**Last updated:** 2025‑06‑08
+
+---
+
+### 1  Overview
+
+Build a web app that lets a user **embed their verified Google‑account email address inside an image (≤ 1 MB)** and later lets anyone **reveal** that email to confirm origin.  No videos, no external domains, no user‑managed keys.
+
+---
+
+### 2  Problem Statement
+
+When images circulate on social media it’s hard to prove who originally posted them.  Users want a friction‑free way to attach a *cryptographically verifiable* identity (their Google email) to each picture without handling private keys.
+
+---
+
+### 3  Goals & Success Metrics
+
+| Goal                   | KPI                                  | Target                 |
+| ---------------------- | ------------------------------------ | ---------------------- |
+| Fast signing           | Time from upload → signed download   | ≤ 5 s for 1 MB JPG/PNG |
+| Easy verification      | % verifications that reveal an email | ≥ 98 %                 |
+| Security               | Pen‑test critical issues             | 0                      |
+| Deployment reliability | Successful Vercel prod builds        | 100 % last 20 merges   |
+
+---
+
+### 4  Key Design Principles
+
+1. **Images‑only scope** – Accept JPG & PNG up to 1 MB; reject others.
+2. **OAuth trust anchor** – Google Sign‑In supplies verified email; no passwords.
+3. **Server‑side signing** – App holds a single asymmetric keypair (stored in Vercel env secret) and uses the public key to *encrypt* the email; ciphertext embedded in image metadata.
+4. **Metadata, not stego** – Use XMP tag `EmailCipher` (base64); keeps file portable.
+5. **Edge verification** – Small files let us decrypt & reveal in a Vercel Edge Function for near‑instant results.
+
+---
+
+### 5  Personas & User Stories
+
+| Persona         | Story                                                                  | Priority |
+| --------------- | ---------------------------------------------------------------------- | -------- |
+| Content Creator | “Prove a meme really came from *[me@email.com](mailto:me@email.com)*.” | P0       |
+| Viewer          | “Drop the image and instantly see who posted it.”                      | P0       |
+| Moderator       | “Batch‑check images for spam or forged origin.”                        | P1       |
+
+---
+
+### 6  Functional Requirements
+
+| #  | Feature                    | Description                                                                                                                                                            | Pri |
+| -- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| F1 | **Google Auth**            | Sign‑in with Google OAuth 2.0 → obtain verified email & ID token.                                                                                                      | P0  |
+| F2 | **Image Upload & Signing** | After auth, user uploads ≤ 1 MB JPG/PNG; server encrypts email with its private key, writes base64 cipher to XMP tag `EmailCipher`, returns signed image for download. | P0  |
+| F3 | **Image Verification**     | Any user uploads image → Edge Function extracts `EmailCipher`, decrypts with server private key, displays email if valid else “Unsigned”.                              | P0  |
+| F4 | **Rate Limiting**          | 10 sign requests/day/user; 60 verify requests/min/IP via Vercel Middleware.                                                                                            | P1  |
+| F5 | **Audit Logs**             | Store sign & verify events (hash + email) in DynamoDB for abuse tracing.                                                                                               | P2  |
+
+---
+
+### 7  Non‑Functional Requirements
+
+| Area          | Requirement                                                                                                          |
+| ------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Security      | Private key stored in Vercel encrypted env var; rotate quarterly; OWASP top‑10 clean; no email stored in plain text. |
+| Performance   | Sign & verify ≤ 250 ms server CPU; total round‑trip ≤ 5 s @ 50 Mbps.                                                 |
+| Scalability   | Vercel Edge handles 1 k concurrent verifications; Background Function used for signing if CPU‑bound.                 |
+| Compliance    | GDPR & Australian Privacy Principles; email only in cipher.                                                          |
+| Accessibility | WCAG 2.1 AA.                                                                                                         |
+
+---
+
+### 8  Architecture
+
+```mermaid
+flowchart LR
+  subgraph Client (Next.js)
+    U((User)) -- Google OAuth --> Auth
+    U -- upload 1 MB image --> UI
+  end
+  UI -- POST /api/sign --> BG[Background Function (sign)]
+  BG -- encrypt(email) --> Img[Writes XMP EmailCipher]
+  BG -- returns --> UI
+  UI -- PUT signed image --> Blob[Vercel Blob Storage]
+
+  U2((Verifier)) -- upload image --> VUI
+  VUI -- POST /api/verify --> Edge[/Edge Function/]
+  Edge -- decrypt --> Show[Email revealed]
+```
+
+---
+
+### 9  Tech Stack
+
+| Layer      | Choice                                                                                        | Why                          |
+| ---------- | --------------------------------------------------------------------------------------------- | ---------------------------- |
+| Front‑end  | Next.js 14 (App Router) + Tailwind + shadcn/ui                                                | Cursor & Vercel first‑class. |
+| Auth       | **Next‑Auth.js** Google provider                                                              | 5‑minute work to set up.     |
+| Crypto     | Node `crypto` RSA‑OAEP (2048‑bit)                                                             | Simple & approved.           |
+| Signing Fn | Vercel *Background Function* (can run longer than Edge).                                      |                              |
+| Verify Fn  | Vercel *Edge Function* – <1 MB payload.                                                       |                              |
+| Storage    | Vercel Blob (R2) for signed images; Vercel KV cache for short‑lived items; DynamoDB for logs. |                              |
+| CI/CD      | Cursor → GitHub → Vercel auto‑deploy.                                                         |                              |
+
+---
+
+### 10  API Endpoints
+
+```http
+POST /api/sign   (Background Function)
+Headers: Authorization: Bearer <next-auth session>
+Body: multipart/form-data { file }
+→ 201 { downloadUrl }
+
+POST /api/verify (Edge Function)
+Body: multipart/form-data { file }
+→ 200 {
+  "status": "signed"|"unsigned"|"error",
+  "email": "user@example.com"|null
+}
+```
+
+---
+
+### 11  Roadmap
+
+| Phase       | Duration | Deliverables                                                  |
+| ----------- | -------- | ------------------------------------------------------------- |
+| **0 Spike** | 2 days   | RSA keypair; hard‑coded encrypt/decrypt round‑trip in Cursor. |
+| **1 MVP**   | 2 weeks  | F1‑F3 working on Vercel; ≤ 1 MB limit; basic UI.              |
+| **2 Beta**  | 3 weeks  | F4 rate‑limit; F5 logging; unit + e2e tests; UX polish.       |
+| **3 GA**    | 4 weeks  | Security audit; Docs; marketing page; B2B outreach.           |
+
+---
+
+### 12  Open Questions & Risks
+
+1. **Email exposure** – revealing the email to *anyone* might raise privacy issues; consider hashing + template?
+2. **Image‑format quirks** – ensure XMP survives Twitter / FB re‑compression (test!).
+3. **Key management** – single private key is a SPOF; rotate & store backup in AWS KMS.
+
+---
+
+> **Next step:** team review; once approved create `/apps/web` in monorepo, scaffold Next‑Auth & file‑upload route.
