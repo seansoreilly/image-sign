@@ -5,6 +5,10 @@ import { getValidatedEnv } from '@/lib/env-validation';
 import crypto from 'crypto';
 import sharp from 'sharp';
 import piexif from 'piexifjs';
+import extract from 'png-chunks-extract';
+import encode from 'png-chunks-encode';
+import { encode as encodeText, decode as decodeText } from 'png-chunk-text';
+import { logAuditEvent, LogEvent } from '@/lib/logging';
 
 // Maximum file size: 5MB
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -47,6 +51,21 @@ export async function POST(request: NextRequest) {
     // Process the image
     const signedImageBuffer = await processImage(file, session.user.email);
     
+    // Calculate image hash for logging
+    const imageHash = crypto.createHash('sha256').update(signedImageBuffer).digest('hex');
+
+    // Log the audit event
+    await logAuditEvent(
+      LogEvent.SIGN,
+      session.user.email,
+      imageHash,
+      {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+      }
+    );
+
     // Return the signed image
     return new NextResponse(signedImageBuffer, {
       status: 200,
@@ -164,32 +183,38 @@ async function processImage(file: File, userEmail: string): Promise<Buffer> {
         .jpeg({ quality: 95 })
         .toBuffer();
     }
+  } else if (metadata.format === 'png') {
+    // For PNG files, embed signature in a text chunk
+    try {
+        const chunks = extract(buffer);
+
+        // Filter out any existing signature chunks
+        const otherChunks = chunks.filter(chunk => {
+            if (chunk.name === 'tEXt') {
+                try {
+                    const decoded = decodeText(chunk.data);
+                    return decoded.keyword !== 'Signature';
+                } catch (e) {
+                    return true; // Keep malformed chunks
+                }
+            }
+            return true;
+        });
+
+        // Add our new signature chunk
+        const textChunk = encodeText('Signature', signature);
+        otherChunks.splice(-1, 0, textChunk); // Insert before IEND chunk
+
+        return Buffer.from(encode(otherChunks));
+    } catch (pngError) {
+        console.warn('PNG metadata embedding failed, falling back to original buffer:', pngError);
+        return buffer;
+    }
   } else {
-    // For non-JPEG formats, add a subtle watermark with the signature
-    const { width = 1000, height = 1000 } = metadata;
-    
-    // Create a subtle watermark
-    const watermarkSvg = `
-      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-        <text x="10" y="${height - 10}" 
-              font-family="Arial" 
-              font-size="12" 
-              fill="rgba(255,255,255,0.3)"
-              transform="rotate(-45 ${width/2} ${height/2})">
-          ${signature.substring(0, 50)}...
-        </text>
-      </svg>
-    `;
-    
-    const watermarkBuffer = Buffer.from(watermarkSvg);
-    
-    return await sharp(buffer)
-      .composite([{ 
-        input: watermarkBuffer, 
-        gravity: 'southeast',
-        blend: 'over'
-      }])
-      .withMetadata()
-      .toBuffer();
+    // For other non-JPEG formats (GIF, WEBP), we currently don't have a metadata solution
+    // The watermark approach was flawed because of truncation.
+    // For now, we will return the original image buffer without a signature for these formats.
+    console.warn(`Signature embedding not implemented for ${metadata.format}, returning original image.`);
+    return buffer;
   }
 } 
