@@ -144,16 +144,59 @@ async function processImage(
   // Create metadata
   const timestamp = new Date().toISOString();
   
-  // Create a digital signature
-  const sign = crypto.createSign('sha256');
-  sign.update(buffer);
-  sign.update(encryptedEmail);
-  sign.update(timestamp);
+  // Handle private key formatting - the key might be base64 encoded with or without PEM headers
+  let formattedPrivateKey: string;
   
-  // The private key is expected to be in PEM format, but stored in a single line in env.
-  // We need to reformat it to the correct PEM format.
-  const formattedPrivateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey.replace(/ /g, '\n')}\n-----END PRIVATE KEY-----`;
-  const signature = sign.sign(formattedPrivateKey, 'base64');
+  try {
+    // First, try to decode the base64 to see if it contains PEM headers
+    const decodedKey = Buffer.from(privateKey, 'base64').toString('utf-8');
+    
+    if (decodedKey.includes('-----BEGIN PRIVATE KEY-----')) {
+      // Key already has PEM headers, use as-is
+      formattedPrivateKey = decodedKey;
+    } else {
+      // Key is raw base64 without headers, add them
+      const keyWithLineBreaks = privateKey.replace(/(.{64})/g, '$1\n');
+      formattedPrivateKey = `-----BEGIN PRIVATE KEY-----\n${keyWithLineBreaks}\n-----END PRIVATE KEY-----`;
+    }
+  } catch (error) {
+    // If base64 decoding fails, assume it's already a PEM formatted string
+    if (privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
+      formattedPrivateKey = privateKey;
+    } else {
+      // Last resort: treat as raw base64 and add headers
+      const keyWithLineBreaks = privateKey.replace(/(.{64})/g, '$1\n');
+      formattedPrivateKey = `-----BEGIN PRIVATE KEY-----\n${keyWithLineBreaks}\n-----END PRIVATE KEY-----`;
+    }
+  }
+  
+  // Create the data to be signed
+  const dataToSign = Buffer.concat([
+    buffer,
+    Buffer.from(encryptedEmail, 'utf8'),
+    Buffer.from(timestamp, 'utf8')
+  ]);
+  
+  // Create a digital signature - handle both RSA and Ed25519 keys
+  let signature: string;
+  
+  try {
+    // Try Ed25519 signing first (no hash algorithm needed for Ed25519)
+    signature = crypto.sign(null, dataToSign, formattedPrivateKey).toString('base64');
+  } catch (ed25519Error) {
+    try {
+      // Fallback to RSA/ECDSA signing with SHA-256
+      const sign = crypto.createSign('sha256');
+      sign.update(buffer);
+      sign.update(encryptedEmail);
+      sign.update(timestamp);
+      signature = sign.sign(formattedPrivateKey, 'base64');
+    } catch (rsaError) {
+      console.error('Ed25519 signing failed:', ed25519Error);
+      console.error('RSA signing failed:', rsaError);
+      throw new Error('Unable to sign with either Ed25519 or RSA methods');
+    }
+  }
 
   // Create signature metadata payload
   const signaturePayload = {

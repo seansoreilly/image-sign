@@ -88,8 +88,15 @@ export default function ImageUpload() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Upload failed");
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage =
+          errorData &&
+          typeof errorData === "object" &&
+          "error" in errorData &&
+          typeof errorData.error === "string"
+            ? errorData.error
+            : "Upload failed";
+        throw new Error(errorMessage);
       }
 
       // Get the signed image as a blob

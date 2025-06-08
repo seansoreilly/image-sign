@@ -111,9 +111,18 @@ async function extractMetadata(file: File): Promise<string | null> {
       if (exifDict['0th'] && exifDict['0th'][piexif.ImageIFD.ImageDescription]) {
         const imageDescription = exifDict['0th'][piexif.ImageIFD.ImageDescription];
         
-        // Check if this is our signature format
-        if (typeof imageDescription === 'string' && imageDescription.startsWith('signed:')) {
-          return imageDescription;
+        // Check if this is our signature format (JSON payload)
+        if (typeof imageDescription === 'string') {
+          try {
+            // Try to parse as JSON first
+            JSON.parse(imageDescription);
+            return imageDescription;
+          } catch {
+            // If not JSON, check for legacy format
+            if (imageDescription.startsWith('signed:')) {
+              return imageDescription;
+            }
+          }
         }
       }
     } catch (exifError) {
@@ -129,9 +138,18 @@ async function extractMetadata(file: File): Promise<string | null> {
         try {
           const decoded = decodeText(chunk.data);
           if (decoded.keyword === 'Signature') {
-            // Check if this is our signature format
-            if (typeof decoded.text === 'string' && decoded.text.startsWith('signed:')) {
-              return decoded.text;
+            // Check if this is our signature format (JSON payload)
+            if (typeof decoded.text === 'string') {
+              try {
+                // Try to parse as JSON first
+                JSON.parse(decoded.text);
+                return decoded.text;
+              } catch {
+                // If not JSON, check for legacy format
+                if (decoded.text.startsWith('signed:')) {
+                  return decoded.text;
+                }
+              }
             }
           }
         } catch (e) {
@@ -194,18 +212,113 @@ async function verifyImage(file: File): Promise<VerificationResult> {
       };
     }
     
-    // Parse the signature format: "signed:encryptedEmail:timestamp"
-    const signatureParts = signature.split(':');
+    // Parse the signature format - handle both JSON and legacy formats
+    let encryptedEmail: string;
+    let timestamp: string;
+    let digitalSignature: string | undefined;
     
-    if (signatureParts.length !== 3 || signatureParts[0] !== 'signed') {
-      return {
-        verified: false,
-        error: 'Invalid signature format',
-        details: 'The image contains unrecognized signature data'
-      };
+    try {
+      // Try to parse as JSON first (new format)
+      const signaturePayload = JSON.parse(signature);
+      if (signaturePayload.email && signaturePayload.timestamp) {
+        encryptedEmail = signaturePayload.email;
+        timestamp = signaturePayload.timestamp;
+        digitalSignature = signaturePayload.signature;
+      } else {
+        throw new Error('Invalid JSON signature format');
+      }
+    } catch {
+      // Fall back to legacy format: "signed:encryptedEmail:timestamp"
+      const signatureParts = signature.split(':');
+      
+      if (signatureParts.length !== 3 || signatureParts[0] !== 'signed') {
+        return {
+          verified: false,
+          error: 'Invalid signature format',
+          details: 'The image contains unrecognized signature data'
+        };
+      }
+      
+      [, encryptedEmail, timestamp] = signatureParts;
     }
     
-    const [, encryptedEmail, timestamp] = signatureParts;
+    // Verify the cryptographic signature if present
+    if (digitalSignature) {
+      try {
+        // Get the original image buffer for signature verification
+        const buffer = Buffer.from(await file.arrayBuffer());
+        
+        // Get the public key and format it
+        const env = getValidatedEnv();
+        let formattedPublicKey: string;
+        
+        try {
+          // Try to decode base64 to see if it contains PEM headers
+          const decodedPublicKey = Buffer.from(env.SIGNING_PUBLIC_KEY, 'base64').toString('utf-8');
+          
+          if (decodedPublicKey.includes('-----BEGIN PUBLIC KEY-----')) {
+            // Key already has PEM headers
+            formattedPublicKey = decodedPublicKey;
+          } else {
+            // Key is raw base64 without headers, add them
+            const keyWithLineBreaks = env.SIGNING_PUBLIC_KEY.replace(/(.{64})/g, '$1\n');
+            formattedPublicKey = `-----BEGIN PUBLIC KEY-----\n${keyWithLineBreaks}\n-----END PUBLIC KEY-----`;
+          }
+        } catch (error) {
+          // If base64 decoding fails, assume it's already a PEM formatted string
+          if (env.SIGNING_PUBLIC_KEY.includes('-----BEGIN PUBLIC KEY-----')) {
+            formattedPublicKey = env.SIGNING_PUBLIC_KEY;
+          } else {
+            // Last resort: treat as raw base64 and add headers
+            const keyWithLineBreaks = env.SIGNING_PUBLIC_KEY.replace(/(.{64})/g, '$1\n');
+            formattedPublicKey = `-----BEGIN PUBLIC KEY-----\n${keyWithLineBreaks}\n-----END PUBLIC KEY-----`;
+          }
+        }
+        
+        // Create the data that was signed (same as in signing)
+        const dataToSign = Buffer.concat([
+          buffer,
+          Buffer.from(encryptedEmail, 'utf8'),
+          Buffer.from(timestamp, 'utf8')
+        ]);
+        
+        // Verify the signature - handle both Ed25519 and RSA keys
+        let isValidSignature = false;
+        
+        try {
+          // Try Ed25519 verification first
+          isValidSignature = crypto.verify(null, dataToSign, formattedPublicKey, Buffer.from(digitalSignature, 'base64'));
+        } catch (ed25519Error) {
+          try {
+            // Fallback to RSA/ECDSA verification with SHA-256
+            const verify = crypto.createVerify('sha256');
+            verify.update(buffer);
+            verify.update(encryptedEmail);
+            verify.update(timestamp);
+            isValidSignature = verify.verify(formattedPublicKey, digitalSignature, 'base64');
+          } catch (rsaError) {
+            console.error('Ed25519 verification failed:', ed25519Error);
+            console.error('RSA verification failed:', rsaError);
+            isValidSignature = false;
+          }
+        }
+        
+        if (!isValidSignature) {
+          return {
+            verified: false,
+            error: 'Invalid cryptographic signature',
+            details: 'The digital signature could not be verified with the public key'
+          };
+        }
+      } catch (signatureError) {
+        console.error('Signature verification failed:', signatureError);
+        return {
+          verified: false,
+          error: 'Signature verification failed',
+          details: 'An error occurred while verifying the cryptographic signature'
+        };
+      }
+    }
     
     // Decrypt the email
     const decryptedEmail = await decryptEmail(encryptedEmail);
