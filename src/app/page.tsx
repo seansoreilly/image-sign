@@ -1,5 +1,6 @@
 import AuthHeader from "@/components/AuthHeader";
 import AuthStatus from "@/components/AuthStatus";
+import ImageUpload from "@/components/ImageUpload";
 
 export default function Home() {
   return (
@@ -21,6 +22,10 @@ export default function Home() {
 
           <div className="max-w-md mx-auto">
             <AuthStatus />
+          </div>
+
+          <div className="max-w-2xl mx-auto">
+            <ImageUpload />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16">

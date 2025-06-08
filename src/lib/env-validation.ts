@@ -8,6 +8,7 @@ interface RequiredEnvVars {
   GOOGLE_CLIENT_SECRET: string
   NEXTAUTH_SECRET: string
   NEXTAUTH_URL?: string
+  ENCRYPTION_SECRET?: string
 }
 
 class EnvironmentError extends Error {
@@ -83,6 +84,7 @@ export function validateEnvironmentVariables(): RequiredEnvVars {
     GOOGLE_CLIENT_SECRET: requiredVars.GOOGLE_CLIENT_SECRET!,
     NEXTAUTH_SECRET: requiredVars.NEXTAUTH_SECRET!,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL || 'http://localhost:3000',
+    ENCRYPTION_SECRET: process.env.ENCRYPTION_SECRET,
   }
 }
 
