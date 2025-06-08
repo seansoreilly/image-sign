@@ -7,6 +7,8 @@ interface RequiredEnvVars {
   GOOGLE_CLIENT_ID: string
   GOOGLE_CLIENT_SECRET: string
   NEXTAUTH_SECRET: string
+  SIGNING_PRIVATE_KEY: string
+  SIGNING_PUBLIC_KEY: string
   NEXTAUTH_URL?: string
   ENCRYPTION_SECRET?: string
 }
@@ -30,6 +32,8 @@ export function validateEnvironmentVariables(): RequiredEnvVars {
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
+    SIGNING_PRIVATE_KEY: process.env.SIGNING_PRIVATE_KEY,
+    SIGNING_PUBLIC_KEY: process.env.SIGNING_PUBLIC_KEY,
   }
 
   // Validate each required variable
@@ -52,6 +56,28 @@ export function validateEnvironmentVariables(): RequiredEnvVars {
     errors.push('❌ NEXTAUTH_SECRET contains placeholder value')
   }
 
+  if (
+    !process.env.SIGNING_PRIVATE_KEY ||
+    process.env.SIGNING_PRIVATE_KEY.trim() === ''
+  ) {
+    errors.push('❌ SIGNING_PRIVATE_KEY is not set or empty')
+  } else if (
+    process.env.SIGNING_PRIVATE_KEY === 'your_private_key_here'
+  ) {
+    errors.push('❌ SIGNING_PRIVATE_KEY contains placeholder value')
+  }
+
+  if (
+    !process.env.SIGNING_PUBLIC_KEY ||
+    process.env.SIGNING_PUBLIC_KEY.trim() === ''
+  ) {
+    errors.push('❌ SIGNING_PUBLIC_KEY is not set or empty')
+  } else if (
+    process.env.SIGNING_PUBLIC_KEY === 'your_public_key_here'
+  ) {
+    errors.push('❌ SIGNING_PUBLIC_KEY contains placeholder value')
+  }
+
   // If there are errors, provide helpful guidance
   if (errors.length > 0) {
     const errorMessage = [
@@ -69,6 +95,8 @@ export function validateEnvironmentVariables(): RequiredEnvVars {
       '   GOOGLE_CLIENT_ID=your_client_id',
       '   GOOGLE_CLIENT_SECRET=your_client_secret',
       '   NEXTAUTH_SECRET=your_secret_key',
+      '   SIGNING_PRIVATE_KEY=your_private_key_in_base64',
+      '   SIGNING_PUBLIC_KEY=your_public_key_in_base64',
       '   NEXTAUTH_URL=http://localhost:3000',
       '',
       '🔗 For setup help, see:',
@@ -83,6 +111,8 @@ export function validateEnvironmentVariables(): RequiredEnvVars {
     GOOGLE_CLIENT_ID: requiredVars.GOOGLE_CLIENT_ID!,
     GOOGLE_CLIENT_SECRET: requiredVars.GOOGLE_CLIENT_SECRET!,
     NEXTAUTH_SECRET: requiredVars.NEXTAUTH_SECRET!,
+    SIGNING_PRIVATE_KEY: requiredVars.SIGNING_PRIVATE_KEY!,
+    SIGNING_PUBLIC_KEY: requiredVars.SIGNING_PUBLIC_KEY!,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL || 'http://localhost:3000',
     ENCRYPTION_SECRET: process.env.ENCRYPTION_SECRET,
   }

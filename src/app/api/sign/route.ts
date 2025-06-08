@@ -48,8 +48,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get validated environment variables
+    const env = getValidatedEnv();
+
     // Process the image
-    const signedImageBuffer = await processImage(file, session.user.email);
+    const signedImageBuffer = await processImage(
+      file, 
+      session.user.email,
+      env.SIGNING_PRIVATE_KEY
+    );
     
     // Calculate image hash for logging
     const imageHash = crypto.createHash('sha256').update(signedImageBuffer).digest('hex');
@@ -106,7 +113,7 @@ async function validateImage(file: File): Promise<string | null> {
   return null;
 }
 
-async function encryptEmail(email: string): Promise<string> {
+function encryptEmail(email: string): string {
   // Get validated environment variables
   const env = getValidatedEnv();
   const secretKey = env.ENCRYPTION_SECRET || env.NEXTAUTH_SECRET;
@@ -124,16 +131,39 @@ async function encryptEmail(email: string): Promise<string> {
   return `${iv.toString('hex')}:${encrypted}`;
 }
 
-async function processImage(file: File, userEmail: string): Promise<Buffer> {
+async function processImage(
+  file: File, 
+  userEmail: string,
+  privateKey: string
+): Promise<Buffer> {
   const buffer = Buffer.from(await file.arrayBuffer());
   
   // Encrypt the user's email
-  const encryptedEmail = await encryptEmail(userEmail);
+  const encryptedEmail = encryptEmail(userEmail);
   
-  // Create signature metadata
+  // Create metadata
   const timestamp = new Date().toISOString();
-  const signature = `signed:${encryptedEmail}:${timestamp}`;
   
+  // Create a digital signature
+  const sign = crypto.createSign('sha256');
+  sign.update(buffer);
+  sign.update(encryptedEmail);
+  sign.update(timestamp);
+  
+  // The private key is expected to be in PEM format, but stored in a single line in env.
+  // We need to reformat it to the correct PEM format.
+  const formattedPrivateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey.replace(/ /g, '\n')}\n-----END PRIVATE KEY-----`;
+  const signature = sign.sign(formattedPrivateKey, 'base64');
+
+  // Create signature metadata payload
+  const signaturePayload = {
+    signature,
+    email: encryptedEmail,
+    timestamp,
+  };
+
+  const signatureString = JSON.stringify(signaturePayload);
+
   // Get image metadata
   const metadata = await sharp(buffer).metadata();
   
@@ -162,7 +192,7 @@ async function processImage(file: File, userEmail: string): Promise<Buffer> {
       if (!exifDict['Exif']) exifDict['Exif'] = {};
       
       // Add our signature to EXIF data
-      exifDict['0th'][piexif.ImageIFD.ImageDescription] = signature;
+      exifDict['0th'][piexif.ImageIFD.ImageDescription] = signatureString;
       exifDict['0th'][piexif.ImageIFD.Software] = 'Image-Sign Application';
       exifDict['0th'][piexif.ImageIFD.DateTime] = timestamp.replace('T', ' ').split('.')[0];
       exifDict['Exif'][piexif.ExifIFD.UserComment] = `Signed by: ${userEmail}`;
@@ -202,7 +232,7 @@ async function processImage(file: File, userEmail: string): Promise<Buffer> {
         });
 
         // Add our new signature chunk
-        const textChunk = encodeText('Signature', signature);
+        const textChunk = encodeText('Signature', signatureString);
         otherChunks.splice(-1, 0, textChunk); // Insert before IEND chunk
 
         return Buffer.from(encode(otherChunks));
