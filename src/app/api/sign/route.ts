@@ -229,13 +229,9 @@ async function processImage(
   if (metadata.format === 'jpeg') {
     // For JPEG files, embed signature in EXIF data
     try {
-      const jpegBuffer = await sharp(buffer)
-        .withMetadata()
-        .jpeg({ quality: 95 })
-        .toBuffer();
-      
+      // Work directly with the original buffer, avoid Sharp processing for JPEG
       // Convert buffer to base64 for piexif
-      const jpegBase64 = jpegBuffer.toString('base64');
+      const jpegBase64 = buffer.toString('base64');
       const jpegDataUrl = `data:image/jpeg;base64,${jpegBase64}`;
       
       // Load existing EXIF data or create new
@@ -262,15 +258,14 @@ async function processImage(
       
       // Convert back to buffer
       const base64Data = signedImageDataUrl.replace(/^data:image\/jpeg;base64,/, '');
+      
+      console.log('✅ JPEG EXIF signature embedded successfully');
       return Buffer.from(base64Data, 'base64');
       
     } catch (exifError) {
-      console.warn('EXIF embedding failed, falling back to basic processing:', exifError);
-      // Fallback to basic processing without EXIF
-      return await sharp(buffer)
-        .withMetadata()
-        .jpeg({ quality: 95 })
-        .toBuffer();
+      console.warn('EXIF embedding failed:', exifError);
+      // Return original buffer if EXIF fails
+      return buffer;
     }
   } else if (metadata.format === 'png') {
     // For PNG files, embed signature in a text chunk

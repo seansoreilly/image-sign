@@ -104,6 +104,13 @@ async function extractMetadata(file: File): Promise<string | null> {
   const buffer = Buffer.from(await file.arrayBuffer());
   const type = await fileTypeFromBuffer(buffer);
   
+  console.log('🔍 Extracting metadata from file:', {
+    fileName: file.name,
+    fileSize: file.size,
+    detectedType: type?.mime,
+    bufferSize: buffer.length
+  });
+  
   if (type && type.mime === 'image/jpeg') {
     try {
       // Convert buffer to base64 for piexif
@@ -112,6 +119,13 @@ async function extractMetadata(file: File): Promise<string | null> {
       
       // Load EXIF data
       const exifDict = piexif.load(jpegDataUrl);
+      
+      console.log('📋 JPEG EXIF data loaded:', {
+        has0th: !!exifDict['0th'],
+        hasExif: !!exifDict['Exif'],
+        hasGPS: !!exifDict['GPS'],
+        imageDescriptionExists: !!(exifDict['0th'] && exifDict['0th'][piexif.ImageIFD.ImageDescription])
+      });
       
       // Extract signature from EXIF ImageDescription
       if (exifDict['0th'] && exifDict['0th'][piexif.ImageIFD.ImageDescription]) {
@@ -139,6 +153,12 @@ async function extractMetadata(file: File): Promise<string | null> {
     try {
       const chunks = extract(buffer);
       const textChunks = chunks.filter(chunk => chunk.name === 'tEXt');
+
+      console.log('📋 PNG chunks extracted:', {
+        totalChunks: chunks.length,
+        textChunks: textChunks.length,
+        chunkNames: chunks.map(c => c.name)
+      });
 
       for (const chunk of textChunks) {
         try {
