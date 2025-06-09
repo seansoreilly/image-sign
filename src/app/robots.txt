@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://image-sign.app/sitemap.xml
+
+# Block crawling of API routes (optional, for privacy)
+Disallow: /api/
+
+# Block crawling of auth routes (they're not useful for SEO)
+Disallow: /auth/
+
+# Allow all other content
+Allow: / 

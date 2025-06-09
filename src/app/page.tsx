@@ -7,15 +7,15 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       <main className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         {/* Hero Section */}
-        <div className="text-center space-y-12">
+        <header className="text-center space-y-12">
           <div className="space-y-6 max-w-4xl mx-auto">
             <div className="space-y-4">
               <h1 className="text-5xl sm:text-6xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent leading-relaxed pb-2">
                 Welcome to Image Sign
               </h1>
-              <p className="text-xl sm:text-2xl text-gray-700 font-medium">
+              <h2 className="text-xl sm:text-2xl text-gray-700 font-medium">
                 Secure image signing with digital authentication
-              </p>
+              </h2>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
                 Protect your digital assets with cryptographic signatures. Sign
                 in with your Google account to embed your verified identity
@@ -33,6 +33,7 @@ export default function Home() {
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
+                    aria-label="Security shield icon"
                   >
                     <path
                       strokeLinecap="round"
@@ -45,31 +46,37 @@ export default function Home() {
               </div>
             </div>
           </div>
+        </header>
 
+        {/* Application Interface */}
+        <section className="space-y-12">
           {/* Auth Status Card */}
           <div className="max-w-lg mx-auto">
             <AuthStatus />
           </div>
 
           {/* Image Upload Section */}
-          <div className="max-w-2xl mx-auto">
+          <article className="max-w-2xl mx-auto">
             <ImageUpload />
-          </div>
+          </article>
 
           {/* Signed Image Upload Section */}
-          <div className="max-w-2xl mx-auto pt-12">
+          <article className="max-w-2xl mx-auto pt-12">
             <SignedImageUploader />
-          </div>
+          </article>
+        </section>
 
-          {/* Features Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-20 max-w-6xl mx-auto">
-            <div className="group bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-8 hover:shadow-xl hover:scale-105 transition-all duration-300">
+        {/* Features Grid */}
+        <section className="mt-20">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            <article className="group bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-8 hover:shadow-xl hover:scale-105 transition-all duration-300">
               <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg group-hover:shadow-xl transition-shadow duration-300">
                 <svg
                   className="w-8 h-8 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
+                  aria-label="Authentication icon"
                 >
                   <path
                     strokeLinecap="round"
@@ -87,15 +94,16 @@ export default function Home() {
                 industry-standard security protocols for maximum protection and
                 trust.
               </p>
-            </div>
+            </article>
 
-            <div className="group bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-8 hover:shadow-xl hover:scale-105 transition-all duration-300">
+            <article className="group bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-8 hover:shadow-xl hover:scale-105 transition-all duration-300">
               <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg group-hover:shadow-xl transition-shadow duration-300">
                 <svg
                   className="w-8 h-8 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
+                  aria-label="Digital signing icon"
                 >
                   <path
                     strokeLinecap="round"
@@ -112,15 +120,16 @@ export default function Home() {
                 Embed your encrypted identity directly into image metadata for
                 tamper-proof authenticity verification and ownership proof.
               </p>
-            </div>
+            </article>
 
-            <div className="group bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-8 hover:shadow-xl hover:scale-105 transition-all duration-300">
+            <article className="group bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-8 hover:shadow-xl hover:scale-105 transition-all duration-300">
               <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg group-hover:shadow-xl transition-shadow duration-300">
                 <svg
                   className="w-8 h-8 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
+                  aria-label="Verification icon"
                 >
                   <path
                     strokeLinecap="round"
@@ -137,9 +146,9 @@ export default function Home() {
                 Quickly verify the authenticity and ownership of signed images
                 with our advanced cryptographic validation system.
               </p>
-            </div>
+            </article>
           </div>
-        </div>
+        </section>
       </main>
     </div>
   );

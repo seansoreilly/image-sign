@@ -32,6 +32,7 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     siteName: "Image Sign",
+    url: "https://image-sign.app",
   },
   twitter: {
     card: "summary_large_image",
@@ -53,6 +54,36 @@ export const metadata: Metadata = {
   verification: {
     google: "google-site-verification-token",
   },
+  alternates: {
+    canonical: "https://image-sign.app",
+  },
+};
+
+// Structured data for better SEO
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: "Image Sign",
+  description:
+    "Secure digital image authentication with cryptographic signatures",
+  url: "https://image-sign.app",
+  applicationCategory: "SecurityApplication",
+  operatingSystem: "Web Browser",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
+  },
+  author: {
+    "@type": "Organization",
+    name: "Image Sign",
+  },
+  featureList: [
+    "Digital image signing",
+    "Cryptographic verification",
+    "Google OAuth authentication",
+    "Tamper-proof verification",
+  ],
 };
 
 export default function RootLayout({
@@ -62,6 +93,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(structuredData),
+          }}
+        />
+      </head>
       <body className={inter.className}>
         <NextAuthSessionProvider>{children}</NextAuthSessionProvider>
       </body>
