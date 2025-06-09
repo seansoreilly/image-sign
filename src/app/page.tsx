@@ -1,4 +1,3 @@
-import AuthHeader from "@/components/AuthHeader";
 import AuthStatus from "@/components/AuthStatus";
 import ImageUpload from "@/components/ImageUpload";
 import SignedImageUploader from "@/components/SignedImageUploader";
@@ -6,13 +5,12 @@ import SignedImageUploader from "@/components/SignedImageUploader";
 export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      <AuthHeader />
       <main className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         {/* Hero Section */}
         <div className="text-center space-y-12">
           <div className="space-y-6 max-w-4xl mx-auto">
             <div className="space-y-4">
-              <h1 className="text-5xl sm:text-6xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent leading-tight">
+              <h1 className="text-5xl sm:text-6xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent leading-relaxed pb-2">
                 Welcome to Image Sign
               </h1>
               <p className="text-xl sm:text-2xl text-gray-700 font-medium">
