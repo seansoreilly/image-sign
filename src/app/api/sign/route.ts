@@ -197,7 +197,7 @@ async function processImage(
     signature = crypto.sign(null, dataToSign, formattedPrivateKey).toString('base64');
     console.log('🔐 Ed25519 signing successful');
   } catch (ed25519Error) {
-    console.log('⚠️ Ed25519 signing failed:', ed25519Error.message);
+    console.log('⚠️ Ed25519 signing failed:', ed25519Error instanceof Error ? ed25519Error.message : 'Unknown error');
     try {
       // Fallback to RSA/ECDSA signing with SHA-256
       console.log('🔐 Attempting RSA/ECDSA signing...');

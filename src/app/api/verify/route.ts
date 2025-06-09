@@ -403,7 +403,7 @@ async function verifyImage(file: File): Promise<VerificationResult> {
       isValidSignature = crypto.verify(null, dataToSign, formattedPublicKey, Buffer.from(digitalSignature, 'base64'));
       console.log('🔐 Ed25519 verification result:', isValidSignature);
     } catch (ed25519Error) {
-      console.log('⚠️ Ed25519 verification failed:', ed25519Error.message);
+      console.log('⚠️ Ed25519 verification failed:', ed25519Error instanceof Error ? ed25519Error.message : 'Unknown error');
       try {
         // Fallback to RSA/ECDSA verification with SHA-256
         console.log('🔐 Attempting RSA/ECDSA verification...');
@@ -416,10 +416,12 @@ async function verifyImage(file: File): Promise<VerificationResult> {
       } catch (rsaError) {
         console.error("❌ Ed25519 verification failed:", ed25519Error);
         console.error("❌ RSA verification failed:", rsaError);
+        const ed25519Message = ed25519Error instanceof Error ? ed25519Error.message : 'Unknown error';
+        const rsaMessage = rsaError instanceof Error ? rsaError.message : 'Unknown error';
         return {
           verified: false,
           error: 'Unable to verify signature with either Ed25519 or RSA methods.',
-          details: `Ed25519: ${ed25519Error.message}, RSA: ${rsaError.message}`
+          details: `Ed25519: ${ed25519Message}, RSA: ${rsaMessage}`
         };
       }
     }
