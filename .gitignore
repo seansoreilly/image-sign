@@ -116,4 +116,53 @@ pnpm-lock.yaml
 
 # Uploads (for when we implement image upload)
 uploads/
-temp-uploads/ 
+temp-uploads/
+
+# Image Signing Application Specific
+# Cryptographic keys and certificates (NEVER commit these!)
+*.pem
+*.key
+*.crt
+*.csr
+*.p12
+*.pfx
+private_key.*
+public_key.*
+keys/
+certificates/
+
+# Signed images and related files
+signed-images/
+signed/
+signatures/
+*.sig
+*.signature
+
+# Image processing temporary files
+image-processing-temp/
+temp-images/
+*.processed
+
+# AWS and Cloud provider files
+.aws/
+aws-credentials
+credentials
+
+# Backup files
+*.backup
+*.bak
+backups/
+
+# Application specific logs
+signing.log
+verification.log
+app-*.log
+
+# Test images and data
+test-images/
+sample-images/
+test-data/
+
+# Any encrypted backup files
+encrypted_private_key.*
+*.b64 
