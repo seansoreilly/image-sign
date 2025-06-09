@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Image Sign - Secure Digital Image Authentication",
   description:
-    "Protect your digital assets with cryptographic signatures. Sign in with Google to embed your verified identity into images for tamper-proof authenticity verification.",
+    "Protect your digital assets with cryptographic signatures. Sign in with Google to embed your encrypted email address into images for tamper-proof authenticity verification.",
   keywords: [
     "image signing",
     "digital authentication",
