@@ -17,9 +17,9 @@ export default function Home() {
                 Secure image signing with digital authentication
               </h2>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Protect your digital assets with cryptographic signatures. Sign
-                in with your Google account to embed your verified identity
-                directly into your images.
+                Protect your digital assets with cryptography.
+                Sign in with your Google account and embed your verified email
+                address into your images.
               </p>
             </div>
 
@@ -47,6 +47,7 @@ export default function Home() {
             </div>
           </div>
         </header>
+        <br />
 
         {/* Application Interface */}
         <section className="space-y-12">

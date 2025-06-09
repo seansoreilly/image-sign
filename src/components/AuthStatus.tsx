@@ -141,8 +141,8 @@ export default function AuthStatus() {
             Ready to get started?
           </h2>
           <p className="text-blue-700 leading-relaxed">
-            Sign in with your Google account to securely sign and authenticate
-            your images with cryptographic verification.
+            Sign in with your Google account to embed your encrypted
+            email address into your images.
           </p>
         </div>
 
@@ -172,10 +172,6 @@ export default function AuthStatus() {
           Sign in with Google
         </button>
 
-        {/* Security Note */}
-        <p className="text-xs text-blue-600 bg-blue-100/50 rounded-lg p-3 border border-blue-200/50">
-          🔒 Your data is protected with industry-standard OAuth 2.0 security
-        </p>
       </div>
     </div>
   );
