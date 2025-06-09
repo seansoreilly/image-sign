@@ -1,6 +1,7 @@
 import AuthHeader from "@/components/AuthHeader";
 import AuthStatus from "@/components/AuthStatus";
 import ImageUpload from "@/components/ImageUpload";
+import SignedImageUploader from "@/components/SignedImageUploader";
 
 export default function Home() {
   return (
@@ -55,6 +56,11 @@ export default function Home() {
           {/* Image Upload Section */}
           <div className="max-w-2xl mx-auto">
             <ImageUpload />
+          </div>
+
+          {/* Signed Image Upload Section */}
+          <div className="max-w-2xl mx-auto pt-12">
+            <SignedImageUploader />
           </div>
 
           {/* Features Grid */}
@@ -133,25 +139,6 @@ export default function Home() {
                 Quickly verify the authenticity and ownership of signed images
                 with our advanced cryptographic validation system.
               </p>
-            </div>
-          </div>
-
-          {/* Call to Action */}
-          <div className="mt-16 p-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl shadow-2xl text-white max-w-4xl mx-auto">
-            <h2 className="text-3xl font-bold mb-4">
-              Ready to secure your images?
-            </h2>
-            <p className="text-blue-100 text-lg mb-6">
-              Join thousands of creators protecting their digital assets with
-              cryptographic signatures.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="px-8 py-3 bg-white text-blue-600 font-semibold rounded-xl hover:bg-blue-50 transition-colors shadow-lg">
-                Get Started
-              </button>
-              <button className="px-8 py-3 border border-white/30 text-white font-semibold rounded-xl hover:bg-white/10 transition-colors">
-                Learn More
-              </button>
             </div>
           </div>
         </div>

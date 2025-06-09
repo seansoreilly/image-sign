@@ -177,23 +177,39 @@ async function processImage(
     Buffer.from(timestamp, 'utf8')
   ]);
   
+  console.log('📝 Signing data details:', {
+    bufferSize: buffer.length,
+    encryptedEmailLength: encryptedEmail.length,
+    timestampLength: timestamp.length,
+    totalDataSize: dataToSign.length,
+    encryptedEmail: encryptedEmail,
+    timestamp: timestamp
+  });
+  
   // Create a digital signature - handle both RSA and Ed25519 keys
   let signature: string;
   
+  console.log('🔐 Starting signature creation...');
+  
   try {
     // Try Ed25519 signing first (no hash algorithm needed for Ed25519)
+    console.log('🔐 Attempting Ed25519 signing...');
     signature = crypto.sign(null, dataToSign, formattedPrivateKey).toString('base64');
+    console.log('🔐 Ed25519 signing successful');
   } catch (ed25519Error) {
+    console.log('⚠️ Ed25519 signing failed:', ed25519Error.message);
     try {
       // Fallback to RSA/ECDSA signing with SHA-256
+      console.log('🔐 Attempting RSA/ECDSA signing...');
       const sign = crypto.createSign('sha256');
       sign.update(buffer);
       sign.update(encryptedEmail);
       sign.update(timestamp);
       signature = sign.sign(formattedPrivateKey, 'base64');
+      console.log('🔐 RSA/ECDSA signing successful');
     } catch (rsaError) {
-      console.error('Ed25519 signing failed:', ed25519Error);
-      console.error('RSA signing failed:', rsaError);
+      console.error('❌ Ed25519 signing failed:', ed25519Error);
+      console.error('❌ RSA signing failed:', rsaError);
       throw new Error('Unable to sign with either Ed25519 or RSA methods');
     }
   }
