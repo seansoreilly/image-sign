@@ -125,10 +125,10 @@ export default function SignedImageUploader() {
         {/* Header */}
         <div className="text-center space-y-2">
           <h2 className="text-2xl font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent">
-            Verify Signed Image
+            Read Signed Image
           </h2>
           <p className="text-gray-600">
-            Upload an image to verify its digital signature
+            Upload an image to read its digital signature
           </p>
         </div>
 
