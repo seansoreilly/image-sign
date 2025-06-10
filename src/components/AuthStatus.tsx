@@ -50,7 +50,7 @@ export default function AuthStatus() {
           <div className="space-y-4">
             <h2 className="text-2xl font-bold text-green-800">Welcome back!</h2>
             <p className="text-green-700 font-medium">
-              You're successfully signed in as
+              You&apos;re successfully signed in as
             </p>
 
             {/* User Profile Card */}
@@ -141,8 +141,8 @@ export default function AuthStatus() {
             Ready to get started?
           </h2>
           <p className="text-blue-700 leading-relaxed">
-            Sign in with your Google account to embed your encrypted
-            email address into your images.
+            Sign in with your Google account to embed your encrypted email
+            address into your images.
           </p>
         </div>
 
@@ -171,7 +171,6 @@ export default function AuthStatus() {
           </svg>
           Sign in with Google
         </button>
-
       </div>
     </div>
   );
