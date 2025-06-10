@@ -1,6 +1,33 @@
 /** @type {import('next').NextConfig} */
+const { execSync } = require("child_process");
+
+// Get git commit hash at build time
+function getGitCommitHash() {
+  // First try Vercel's environment variable (available during Vercel builds)
+  if (process.env.VERCEL_GIT_COMMIT_SHA) {
+    const shortHash = process.env.VERCEL_GIT_COMMIT_SHA.substring(0, 7);
+    console.log("Using Vercel commit hash:", shortHash);
+    return shortHash;
+  }
+
+  // Fallback to git command for local development
+  try {
+    const hash = execSync("git rev-parse --short HEAD", {
+      encoding: "utf8",
+    }).trim();
+    console.log("Using local git commit hash:", hash);
+    return hash;
+  } catch (error) {
+    console.warn("Could not get git commit hash:", error.message);
+    return "unknown";
+  }
+}
+
 const nextConfig = {
   // App directory is stable in Next.js 13+, no experimental flag needed
+  env: {
+    GIT_COMMIT_HASH: getGitCommitHash(),
+  },
   images: {
     remotePatterns: [
       {

@@ -17,9 +17,9 @@ export default function Home() {
                 Secure image signing with digital authentication
               </h2>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Protect your digital assets with cryptography.
-                Sign in with your Google account and embed your verified email
-                address into your images.
+                Protect your digital assets with cryptography. Sign in with your
+                Google account and embed your verified email address into your
+                images.
               </p>
             </div>
 
@@ -150,6 +150,18 @@ export default function Home() {
             </article>
           </div>
         </section>
+
+        {/* Footer with Git Commit Hash */}
+        <footer className="mt-16 pt-8 border-t border-gray-200/50">
+          <div className="text-center">
+            <p className="text-sm text-gray-500">
+              Build:{" "}
+              <span className="font-mono text-gray-600">
+                {process.env.GIT_COMMIT_HASH || "unknown"}
+              </span>
+            </p>
+          </div>
+        </footer>
       </main>
     </div>
   );
