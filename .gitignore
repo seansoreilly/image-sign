@@ -98,6 +98,10 @@ tasks/
 .roomodes
 .windsurfrules
 
+# Cursor IDE (allow rules to be tracked)
+.cursor/
+!.cursor/rules/
+
 # Temporary files
 *.tmp
 *.temp
@@ -113,6 +117,18 @@ pnpm-lock.yaml
 # Database
 *.db
 *.sqlite
+
+# Security - Keys and certificates (should never be committed)
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+*.rsa
+certificates/
+keys/
 
 # Uploads (for when we implement image upload)
 uploads/
