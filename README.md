@@ -153,7 +153,7 @@ base64 -w 0 public_key.pem > public_key_base64.txt
 3. **Cryptographic Implementation**:
    - User email encrypted with AES-256-CBC
    - Digital signature created over: `[image_buffer + encrypted_email + timestamp]`
-   - Signature embedded in EXIF data (JPEG) or tEXt chunks (PNG)
+   - Signature embedded in EXIF **UserComment** (JPEG) or tEXt chunks (PNG)
 
 ## 🛡️ Security Features
 

@@ -244,7 +244,7 @@ async function processImage(
       // 3. Add our metadata (with the placeholder) to the existing EXIF data
       if (!exifDict['0th']) exifDict['0th'] = {};
       if (!exifDict['Exif']) exifDict['Exif'] = {};
-      exifDict['0th'][piexif.ImageIFD.ImageDescription] = placeholderSignatureString;
+      exifDict['Exif'][piexif.ExifIFD.UserComment] = placeholderSignatureString;
       exifDict['0th'][piexif.ImageIFD.Software] = 'Image-Sign Application';
       
       // 4. Create the image body that will actually be signed
@@ -278,8 +278,8 @@ async function processImage(
       // 7. Now, create the final EXIF data with the REAL signature
       signaturePayload.signature = signature;
       const finalSignatureString = JSON.stringify(signaturePayload);
-      if (!exifDict['0th']) exifDict['0th'] = {};
-      exifDict['0th'][piexif.ImageIFD.ImageDescription] = finalSignatureString;
+      if (!exifDict['Exif']) exifDict['Exif'] = {};
+      exifDict['Exif'][piexif.ExifIFD.UserComment] = finalSignatureString;
 
       // 8. Embed the final EXIF block into the original image buffer
       const finalExifBytes = piexif.dump(exifDict);
