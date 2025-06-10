@@ -124,12 +124,12 @@ async function extractMetadata(file: File): Promise<string | null> {
         has0th: !!exifDict['0th'],
         hasExif: !!exifDict['Exif'],
         hasGPS: !!exifDict['GPS'],
-        imageDescriptionExists: !!(exifDict['0th'] && exifDict['0th'][piexif.ImageIFD.ImageDescription])
+        userCommentExists: !!(exifDict['Exif'] && exifDict['Exif'][piexif.ExifIFD.UserComment])
       });
-      
-      // Extract signature from EXIF ImageDescription
-      if (exifDict['0th'] && exifDict['0th'][piexif.ImageIFD.ImageDescription]) {
-        const imageDescription = exifDict['0th'][piexif.ImageIFD.ImageDescription];
+
+      // Extract signature from EXIF UserComment
+      if (exifDict['Exif'] && exifDict['Exif'][piexif.ExifIFD.UserComment]) {
+        const imageDescription = exifDict['Exif'][piexif.ExifIFD.UserComment];
         
         // Check if this is our signature format (JSON payload)
         if (typeof imageDescription === 'string') {
@@ -377,8 +377,8 @@ async function verifyImage(file: File): Promise<VerificationResult> {
 
         // Re-create the placeholder that was used during signing
         const placeholderPayload = { signature: '', email: encryptedEmail, timestamp };
-        if (!exifDict['0th']) exifDict['0th'] = {};
-        exifDict['0th'][piexif.ImageIFD.ImageDescription] = JSON.stringify(placeholderPayload);
+        if (!exifDict['Exif']) exifDict['Exif'] = {};
+        exifDict['Exif'][piexif.ExifIFD.UserComment] = JSON.stringify(placeholderPayload);
 
         // Re-build the image with the placeholder EXIF. This buffer should
         // now be identical to the one that was originally signed.
