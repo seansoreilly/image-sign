@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useSession } from "next-auth/react";
+import Image from "next/image";
 
 interface UploadState {
   uploading: boolean;
@@ -293,9 +294,12 @@ export default function ImageUpload() {
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-800">Preview</h3>
             <div className="relative group">
-              <img
+              <Image
                 src={previewUrl}
                 alt="Preview"
+                width={800}
+                height={256}
+                unoptimized={true}
                 className="w-full h-64 object-cover rounded-xl border border-gray-200 shadow-md"
               />
               <button

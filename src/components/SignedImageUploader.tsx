@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Image from "next/image";
 
 interface UploadState {
   uploading: boolean;
@@ -187,9 +188,12 @@ export default function SignedImageUploader() {
           ) : (
             <div>
               {previewUrl && (
-                <img
+                <Image
                   src={previewUrl}
                   alt="Preview"
+                  width={800}
+                  height={192}
+                  unoptimized={true}
                   className="mx-auto max-h-48 rounded-lg object-contain"
                 />
               )}

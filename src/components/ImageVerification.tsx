@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { VerificationResult } from "@/types/verification";
+import Image from "next/image";
 
 interface VerifyState {
   verifying: boolean;
@@ -152,9 +153,12 @@ export default function ImageVerification() {
             </div>
           ) : (
             <div className="space-y-4">
-              <img
+              <Image
                 src={previewUrl!}
                 alt="Preview"
+                width={800}
+                height={192}
+                unoptimized={true}
                 className="w-full h-48 object-cover rounded-xl border border-gray-200 shadow-md"
               />
             </div>
