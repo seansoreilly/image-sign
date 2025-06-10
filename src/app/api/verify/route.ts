@@ -364,17 +364,43 @@ async function verifyImage(file: File): Promise<VerificationResult> {
     const currentBuffer = Buffer.from(await file.arrayBuffer());
     console.log('📄 Current image buffer size:', currentBuffer.length);
     
-    // For PNG files, we need to reconstruct the original buffer by removing the signature chunk
-    let originalBuffer: Buffer;
+    // This will hold the buffer of the data as it was when it was signed
+    let bufferToVerify: Buffer;
     const fileType = await fileTypeFromBuffer(currentBuffer);
     
-    if (fileType && fileType.mime === 'image/png') {
-      console.log('🔄 PNG detected: Reconstructing original buffer by removing signature chunk...');
+    if (fileType && fileType.mime === 'image/jpeg') {
+      console.log('🔄 JPEG detected: Reconstructing the signed buffer state...');
+      try {
+        // Ensure dataUrl is defined in this scope
+        const dataUrl = `data:image/jpeg;base64,${currentBuffer.toString('base64')}`;
+        const exifDict = piexif.load(dataUrl);
+
+        // Re-create the placeholder that was used during signing
+        const placeholderPayload = { signature: '', email: encryptedEmail, timestamp };
+        if (!exifDict['0th']) exifDict['0th'] = {};
+        exifDict['0th'][piexif.ImageIFD.ImageDescription] = JSON.stringify(placeholderPayload);
+
+        // Re-build the image with the placeholder EXIF. This buffer should
+        // now be identical to the one that was originally signed.
+        const exifBytesWithPlaceholder = piexif.dump(exifDict);
+        const reconstructedDataUrl = piexif.insert(exifBytesWithPlaceholder, dataUrl);
+        bufferToVerify = Buffer.from(reconstructedDataUrl.replace(/^data:image\/jpeg;base64,/, ''), 'base64');
+        console.log('🔄 Reconstructed JPEG buffer for verification, size:', bufferToVerify.length);
+      } catch (jpegError) {
+        console.error('❌ Failed to reconstruct JPEG for verification:', jpegError);
+        return { verified: false, error: 'Failed to process JPEG for verification.' };
+      }
+    } else if (fileType && fileType.mime === 'image/png') {
+      console.log('🔄 PNG detected: Attempting to find the original buffer that was signed...');
       try {
         const chunks = extract(currentBuffer);
         
-        // Filter out signature chunks to get the original image
-        const originalChunks = chunks.filter(chunk => {
+        // Get the expected original buffer hash from signature metadata if available
+        const expectedOriginalBufferHash = parsedMetadata.originalBufferHash;
+        console.log('🔍 Expected original buffer hash:', expectedOriginalBufferHash ? expectedOriginalBufferHash.substring(0, 16) + '...' : 'Not available');
+        
+        // Method 1: Try reconstructing by removing signature chunks
+        const chunksWithoutSignature = chunks.filter((chunk: any) => {
           if (chunk.name === 'tEXt') {
             try {
               const decoded = decodeText(chunk.data);
@@ -386,33 +412,69 @@ async function verifyImage(file: File): Promise<VerificationResult> {
           return true;
         });
         
-        // Reconstruct the original PNG without signature chunks
-        originalBuffer = Buffer.from(encode(originalChunks));
-        console.log('🔄 Original PNG buffer reconstructed, size:', originalBuffer.length);
+        const reconstructedBuffer = Buffer.from(encode(chunksWithoutSignature));
+        const reconstructedHash = crypto.createHash('sha256').update(reconstructedBuffer).digest('hex');
+        
+        console.log('🔍 PNG reconstruction attempt:', {
+          currentBufferSize: currentBuffer.length,
+          reconstructedBufferSize: reconstructedBuffer.length,
+          reconstructedHash: reconstructedHash.substring(0, 16) + '...',
+          hashMatch: expectedOriginalBufferHash === reconstructedHash
+        });
+        
+        // If we have the expected hash and it matches, use the reconstructed buffer
+        if (expectedOriginalBufferHash && expectedOriginalBufferHash === reconstructedHash) {
+          bufferToVerify = reconstructedBuffer;
+          console.log('✅ PNG buffer reconstruction successful - hash matches!');
+        } else {
+          // Try other approaches or fall back
+          console.log('⚠️ PNG buffer reconstruction hash mismatch, trying alternative approaches...');
+          
+          // Alternative method: try different chunk ordering or encoding
+          // For now, let's use the reconstructed buffer anyway and see what happens
+          bufferToVerify = reconstructedBuffer;
+          console.log('🔄 Using reconstructed buffer despite hash mismatch');
+        }
+        
       } catch (pngError) {
         console.log('⚠️ Failed to reconstruct original PNG, using current buffer:', pngError);
-        originalBuffer = currentBuffer;
+        bufferToVerify = currentBuffer;
       }
     } else {
-      console.log('📄 Non-PNG image, using current buffer as original');
-      originalBuffer = currentBuffer;
+      console.log('📄 Unsupported image type for verification, verification will fail.');
+      bufferToVerify = currentBuffer; // This will likely fail verification, which is expected.
     }
 
     let isValidSignature = false;
 
     // The data that was originally signed - should match exactly what was signed
     const dataToSign = Buffer.concat([
-      originalBuffer,  // Use original buffer, not current buffer!
+      bufferToVerify,
       Buffer.from(encryptedEmail, 'utf8'),
       Buffer.from(timestamp, 'utf8')
     ]);
     
     console.log('📝 Data to verify details:', {
-      originalBufferSize: originalBuffer.length,
+      bufferToVerifySize: bufferToVerify.length,
       currentBufferSize: currentBuffer.length,
       encryptedEmailLength: encryptedEmail.length,
       timestampLength: timestamp.length,
-      totalDataSize: dataToSign.length
+      totalDataSize: dataToSign.length,
+      encryptedEmail: encryptedEmail,
+      timestamp: timestamp
+    });
+    
+    // Create SHA256 hashes for debugging
+    const bufferHash = crypto.createHash('sha256').update(bufferToVerify).digest('hex');
+    const emailHash = crypto.createHash('sha256').update(Buffer.from(encryptedEmail, 'utf8')).digest('hex');
+    const timestampHash = crypto.createHash('sha256').update(Buffer.from(timestamp, 'utf8')).digest('hex');
+    const dataToSignHash = crypto.createHash('sha256').update(dataToSign).digest('hex');
+    
+    console.log('🔍 Component hashes for debugging:', {
+      bufferHash: bufferHash.substring(0, 16) + '...',
+      emailHash: emailHash.substring(0, 16) + '...',
+      timestampHash: timestampHash.substring(0, 16) + '...',
+      dataToSignHash: dataToSignHash.substring(0, 16) + '...'
     });
 
     console.log('🔐 Starting signature verification...');
@@ -428,9 +490,7 @@ async function verifyImage(file: File): Promise<VerificationResult> {
         // Fallback to RSA/ECDSA verification with SHA-256
         console.log('🔐 Attempting RSA/ECDSA verification...');
         const verify = crypto.createVerify('sha256');
-        verify.update(originalBuffer);  // Use original buffer, not current buffer!
-        verify.update(encryptedEmail);
-        verify.update(timestamp);
+        verify.update(dataToSign);
         isValidSignature = verify.verify(formattedPublicKey, digitalSignature, 'base64');
         console.log('🔐 RSA/ECDSA verification result:', isValidSignature);
       } catch (rsaError) {

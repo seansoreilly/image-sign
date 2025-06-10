@@ -138,33 +138,24 @@ async function processImage(
 ): Promise<Buffer> {
   const buffer = Buffer.from(await file.arrayBuffer());
   
-  // Encrypt the user's email
+  // Encrypt the user's email and create timestamp
   const encryptedEmail = encryptEmail(userEmail);
-  
-  // Create metadata
   const timestamp = new Date().toISOString();
   
-  // Handle private key formatting - the key might be base64 encoded with or without PEM headers
+  // Handle private key formatting
   let formattedPrivateKey: string;
-  
   try {
-    // First, try to decode the base64 to see if it contains PEM headers
     const decodedKey = Buffer.from(privateKey, 'base64').toString('utf-8');
-    
     if (decodedKey.includes('-----BEGIN PRIVATE KEY-----')) {
-      // Key already has PEM headers, use as-is
       formattedPrivateKey = decodedKey;
     } else {
-      // Key is raw base64 without headers, add them
       const keyWithLineBreaks = privateKey.replace(/(.{64})/g, '$1\n');
       formattedPrivateKey = `-----BEGIN PRIVATE KEY-----\n${keyWithLineBreaks}\n-----END PRIVATE KEY-----`;
     }
   } catch (error) {
-    // If base64 decoding fails, assume it's already a PEM formatted string
     if (privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
       formattedPrivateKey = privateKey;
     } else {
-      // Last resort: treat as raw base64 and add headers
       const keyWithLineBreaks = privateKey.replace(/(.{64})/g, '$1\n');
       formattedPrivateKey = `-----BEGIN PRIVATE KEY-----\n${keyWithLineBreaks}\n-----END PRIVATE KEY-----`;
     }
@@ -215,10 +206,12 @@ async function processImage(
   }
 
   // Create signature metadata payload
+  const originalBufferHash = crypto.createHash('sha256').update(buffer).digest('hex');
   const signaturePayload = {
     signature,
     email: encryptedEmail,
     timestamp,
+    originalBufferHash: originalBufferHash
   };
 
   const signatureString = JSON.stringify(signaturePayload);
@@ -232,32 +225,68 @@ async function processImage(
       // Work directly with the original buffer, avoid Sharp processing for JPEG
       // Convert buffer to base64 for piexif
       const jpegBase64 = buffer.toString('base64');
-      const jpegDataUrl = `data:image/jpeg;base64,${jpegBase64}`;
+      const dataUrl = `data:image/jpeg;base64,${jpegBase64}`;
       
-      // Load existing EXIF data or create new
+      // 1. Load existing EXIF data or create a new structure
       let exifDict;
       try {
-        exifDict = piexif.load(jpegDataUrl);
+        exifDict = piexif.load(dataUrl);
       } catch {
-        exifDict = {};
+        console.log('No existing EXIF found, creating new structure.');
+        exifDict = { '0th': {}, 'Exif': {}, 'GPS': {}, '1st': {}, 'thumbnail': undefined };
       }
-      
-      // Ensure required EXIF sections exist
+
+      // 2. Prepare the signature payload, but the signature itself is empty for now
+      const originalBufferHash = crypto.createHash('sha256').update(buffer).digest('hex');
+      const signaturePayload = { signature: '', email: encryptedEmail, timestamp, originalBufferHash };
+      const placeholderSignatureString = JSON.stringify(signaturePayload);
+
+      // 3. Add our metadata (with the placeholder) to the existing EXIF data
       if (!exifDict['0th']) exifDict['0th'] = {};
       if (!exifDict['Exif']) exifDict['Exif'] = {};
-      
-      // Add our signature to EXIF data
-      exifDict['0th'][piexif.ImageIFD.ImageDescription] = signatureString;
+      exifDict['0th'][piexif.ImageIFD.ImageDescription] = placeholderSignatureString;
       exifDict['0th'][piexif.ImageIFD.Software] = 'Image-Sign Application';
-      exifDict['0th'][piexif.ImageIFD.DateTime] = timestamp.replace('T', ' ').split('.')[0];
-      exifDict['Exif'][piexif.ExifIFD.UserComment] = `Signed by: ${userEmail}`;
       
-      // Insert EXIF data back into image
-      const exifBytes = piexif.dump(exifDict);
-      const signedImageDataUrl = piexif.insert(exifBytes, jpegDataUrl);
+      // 4. Create the image body that will actually be signed
+      const exifBytesWithPlaceholder = piexif.dump(exifDict);
+      const imageWithPlaceholderDataUrl = piexif.insert(exifBytesWithPlaceholder, dataUrl);
+      const imageBodyToSign = Buffer.from(imageWithPlaceholderDataUrl.replace(/^data:image\/jpeg;base64,/, ''), 'base64');
+      console.log('🖼️ JPEG body with placeholder EXIF created for signing, size:', imageBodyToSign.length);
+
+      // 5. Create the data payload for the real signature
+      // This is the image buffer with placeholder + email + timestamp
+      const dataToSign = Buffer.concat([
+        imageBodyToSign,
+        Buffer.from(encryptedEmail, 'utf8'),
+        Buffer.from(timestamp, 'utf8')
+      ]);
+
+      // 6. Create the actual digital signature
+      let signature: string;
+      try {
+        console.log('🔐 Attempting Ed25519 signing for JPEG...');
+        signature = crypto.sign(null, dataToSign, formattedPrivateKey).toString('base64');
+        console.log('🔐 Ed25519 signing successful for JPEG');
+      } catch (ed25519Error) {
+        console.log('⚠️ Ed25519 signing failed for JPEG, falling back to RSA/ECDSA...');
+        const sign = crypto.createSign('sha256');
+        sign.update(dataToSign);
+        signature = sign.sign(formattedPrivateKey, 'base64');
+        console.log('🔐 RSA/ECDSA signing successful for JPEG');
+      }
+
+      // 7. Now, create the final EXIF data with the REAL signature
+      signaturePayload.signature = signature;
+      const finalSignatureString = JSON.stringify(signaturePayload);
+      if (!exifDict['0th']) exifDict['0th'] = {};
+      exifDict['0th'][piexif.ImageIFD.ImageDescription] = finalSignatureString;
+
+      // 8. Embed the final EXIF block into the original image buffer
+      const finalExifBytes = piexif.dump(exifDict);
+      const finalImageDataUrl = piexif.insert(finalExifBytes, dataUrl);
       
       // Convert back to buffer
-      const base64Data = signedImageDataUrl.replace(/^data:image\/jpeg;base64,/, '');
+      const base64Data = finalImageDataUrl.replace(/^data:image\/jpeg;base64,/, '');
       
       console.log('✅ JPEG EXIF signature embedded successfully');
       return Buffer.from(base64Data, 'base64');
@@ -268,36 +297,87 @@ async function processImage(
       return buffer;
     }
   } else if (metadata.format === 'png') {
-    // For PNG files, embed signature in a text chunk
+    // PNG logic - sign a normalized version that can be reconstructed during verification
+    console.log('🖼️ Processing PNG...');
+    
     try {
-        const chunks = extract(buffer);
-
-        // Filter out any existing signature chunks
-        const otherChunks = chunks.filter(chunk => {
-            if (chunk.name === 'tEXt') {
-                try {
-                    const decoded = decodeText(chunk.data);
-                    return decoded.keyword !== 'Signature';
-                } catch (e) {
-                    return true; // Keep malformed chunks
-                }
-            }
+      // First, extract chunks and remove any existing signature
+      const chunks = extract(buffer);
+      const chunksWithoutSignature = chunks.filter(chunk => {
+        if (chunk.name === 'tEXt') {
+          try {
+            const decoded = decodeText(chunk.data);
+            return decoded.keyword !== 'Signature';
+          } catch (e) {
             return true;
-        });
+          }
+        }
+        return true;
+      });
+      
+      // Create a normalized buffer without signature
+      const normalizedBuffer = Buffer.from(encode(chunksWithoutSignature));
+      console.log('📄 Normalized PNG buffer size:', normalizedBuffer.length, '(original:', buffer.length, ')');
+      
+      // Now sign the normalized buffer
+      const dataToSign = Buffer.concat([
+        normalizedBuffer, // Sign the normalized buffer
+        Buffer.from(encryptedEmail, 'utf8'),
+        Buffer.from(timestamp, 'utf8')
+      ]);
 
-        // Add our new signature chunk
-        const textChunk = encodeText('Signature', signatureString);
-        otherChunks.splice(-1, 0, textChunk); // Insert before IEND chunk
+      // Debug: Log PNG signing details
+      const bufferHash = crypto.createHash('sha256').update(normalizedBuffer).digest('hex');
+      const emailHash = crypto.createHash('sha256').update(Buffer.from(encryptedEmail, 'utf8')).digest('hex');
+      const timestampHash = crypto.createHash('sha256').update(Buffer.from(timestamp, 'utf8')).digest('hex');
+      const dataToSignHash = crypto.createHash('sha256').update(dataToSign).digest('hex');
+      
+      console.log('🔍 PNG Signing component hashes:', {
+        normalizedBufferHash: bufferHash.substring(0, 16) + '...',
+        emailHash: emailHash.substring(0, 16) + '...',
+        timestampHash: timestampHash.substring(0, 16) + '...',
+        dataToSignHash: dataToSignHash.substring(0, 16) + '...',
+        normalizedBufferSize: normalizedBuffer.length,
+        encryptedEmail: encryptedEmail,
+        timestamp: timestamp
+      });
 
-        return Buffer.from(encode(otherChunks));
+      let signature: string;
+      try {
+        console.log('🔐 Attempting Ed25519 signing for PNG...');
+        signature = crypto.sign(null, dataToSign, formattedPrivateKey).toString('base64');
+        console.log('🔐 Ed25519 signing successful for PNG');
+      } catch (ed25519Error) {
+        console.log('⚠️ Ed25519 signing failed for PNG, falling back to RSA/ECDSA...');
+        const sign = crypto.createSign('sha256');
+        sign.update(dataToSign); // Update with the full payload
+        signature = sign.sign(formattedPrivateKey, 'base64');
+        console.log('🔐 RSA/ECDSA signing successful for PNG');
+      }
+
+      // Include the normalized buffer hash for verification purposes
+      const normalizedBufferHash = crypto.createHash('sha256').update(normalizedBuffer).digest('hex');
+      const signaturePayload = { 
+        signature, 
+        email: encryptedEmail, 
+        timestamp,
+        originalBufferHash: normalizedBufferHash // This is now the hash of the normalized buffer
+      };
+      const signatureString = JSON.stringify(signaturePayload);
+
+      // Now add the signature chunk to the normalized chunks
+      const textChunk = encodeText('Signature', signatureString);
+      chunksWithoutSignature.splice(-1, 0, textChunk); // Insert before IEND chunk
+      
+      const finalBuffer = Buffer.from(encode(chunksWithoutSignature));
+      console.log('✅ PNG signature embedded successfully, final size:', finalBuffer.length);
+      
+      return finalBuffer;
     } catch (pngError) {
-        console.warn('PNG metadata embedding failed, falling back to original buffer:', pngError);
-        return buffer;
+      console.warn('PNG metadata embedding failed, falling back to original buffer:', pngError);
+      return buffer;
     }
   } else {
-    // For other non-JPEG formats (GIF, WEBP), we currently don't have a metadata solution
-    // The watermark approach was flawed because of truncation.
-    // For now, we will return the original image buffer without a signature for these formats.
     console.warn(`Signature embedding not implemented for ${metadata.format}, returning original image.`);
     return buffer;
   }
