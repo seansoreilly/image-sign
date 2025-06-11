@@ -27,10 +27,14 @@ class EnvironmentError extends Error {
 export function validateEnvironmentVariables(): RequiredEnvVars {
   const errors: string[] = []
 
+  // Determine if we are running in debug authentication mode
+  const isDebugAuth = process.env.DEBUG_AUTH === 'true'
+
   // Check for required variables
+  // In debug mode we bypass Google OAuth, so GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are not required.
   const requiredVars = {
-    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
-    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+    GOOGLE_CLIENT_ID: isDebugAuth ? 'debug-mode-bypass' : process.env.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: isDebugAuth ? 'debug-mode-bypass' : process.env.GOOGLE_CLIENT_SECRET,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
     SIGNING_PRIVATE_KEY: process.env.SIGNING_PRIVATE_KEY,
     SIGNING_PUBLIC_KEY: process.env.SIGNING_PUBLIC_KEY,
@@ -44,11 +48,11 @@ export function validateEnvironmentVariables(): RequiredEnvVars {
   }
 
   // Check for common mistakes
-  if (process.env.GOOGLE_CLIENT_ID === 'your_google_client_id_here') {
+  if (!isDebugAuth && process.env.GOOGLE_CLIENT_ID === 'your_google_client_id_here') {
     errors.push('❌ GOOGLE_CLIENT_ID contains placeholder value')
   }
 
-  if (process.env.GOOGLE_CLIENT_SECRET === 'your_google_client_secret_here') {
+  if (!isDebugAuth && process.env.GOOGLE_CLIENT_SECRET === 'your_google_client_secret_here') {
     errors.push('❌ GOOGLE_CLIENT_SECRET contains placeholder value')
   }
 
@@ -108,8 +112,8 @@ export function validateEnvironmentVariables(): RequiredEnvVars {
   }
 
   return {
-    GOOGLE_CLIENT_ID: requiredVars.GOOGLE_CLIENT_ID!,
-    GOOGLE_CLIENT_SECRET: requiredVars.GOOGLE_CLIENT_SECRET!,
+    GOOGLE_CLIENT_ID: isDebugAuth ? '' : requiredVars.GOOGLE_CLIENT_ID!,
+    GOOGLE_CLIENT_SECRET: isDebugAuth ? '' : requiredVars.GOOGLE_CLIENT_SECRET!,
     NEXTAUTH_SECRET: requiredVars.NEXTAUTH_SECRET!,
     SIGNING_PRIVATE_KEY: requiredVars.SIGNING_PRIVATE_KEY!,
     SIGNING_PUBLIC_KEY: requiredVars.SIGNING_PUBLIC_KEY!,
