@@ -154,12 +154,7 @@ export default function Home() {
         {/* Footer with Git Commit Hash */}
         <footer className="mt-16 pt-8 border-t border-gray-200/50">
           <div className="text-center">
-            <p className="text-sm text-gray-500">
-              Build:{" "}
-              <span className="font-mono text-gray-600">
-                {process.env.GIT_COMMIT_HASH || "unknown"}
-              </span>
-            </p>
+          <p className="text-sm text-gray-500">Created by <a href="https://balddata.xyz/" target="_blank" rel="noopener noreferrer">Bald Data</a> • Build: <span className="font-mono text-gray-600">{process.env.GIT_COMMIT_HASH || "unknown"}</span></p>
           </div>
         </footer>
       </main>
