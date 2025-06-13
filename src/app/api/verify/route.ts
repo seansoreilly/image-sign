@@ -373,12 +373,25 @@ async function verifyImage(file: File): Promise<VerificationResult> {
       try {
         // Ensure dataUrl is defined in this scope
         const dataUrl = `data:image/jpeg;base64,${currentBuffer.toString('base64')}`;
-        const exifDict = piexif.load(dataUrl);
+        let exifDict;
+        
+        // Load existing EXIF data or create a new structure (same as signing)
+        try {
+          exifDict = piexif.load(dataUrl);
+        } catch {
+          console.log('No existing EXIF found during reconstruction, creating new structure.');
+          exifDict = { '0th': {}, 'Exif': {}, 'GPS': {}, '1st': {}, 'thumbnail': undefined };
+        }
 
-        // Re-create the placeholder that was used during signing
-        const placeholderPayload = { signature: '', email: encryptedEmail, timestamp };
+        // Re-create the placeholder that was used during signing - including originalBufferHash
+        const originalBufferHash = parsedMetadata.originalBufferHash;
+        const placeholderPayload = { signature: '', email: encryptedEmail, timestamp, originalBufferHash };
+        
+        // Ensure the same EXIF structure as during signing
         if (!exifDict['0th']) exifDict['0th'] = {};
+        if (!exifDict['Exif']) exifDict['Exif'] = {};
         exifDict['0th'][piexif.ImageIFD.ImageDescription] = JSON.stringify(placeholderPayload);
+        exifDict['0th'][piexif.ImageIFD.Software] = 'Image-Sign Application'; // This was missing!
 
         // Re-build the image with the placeholder EXIF. This buffer should
         // now be identical to the one that was originally signed.
@@ -386,6 +399,16 @@ async function verifyImage(file: File): Promise<VerificationResult> {
         const reconstructedDataUrl = piexif.insert(exifBytesWithPlaceholder, dataUrl);
         bufferToVerify = Buffer.from(reconstructedDataUrl.replace(/^data:image\/jpeg;base64,/, ''), 'base64');
         console.log('🔄 Reconstructed JPEG buffer for verification, size:', bufferToVerify.length);
+        
+        // Debug: Compare with original buffer hash if available
+        if (originalBufferHash) {
+          const reconstructedHash = crypto.createHash('sha256').update(bufferToVerify).digest('hex');
+          console.log('🔍 JPEG buffer hash comparison:', {
+            expectedHash: originalBufferHash.substring(0, 16) + '...',
+            reconstructedHash: reconstructedHash.substring(0, 16) + '...',
+            hashMatch: originalBufferHash === reconstructedHash
+          });
+        }
       } catch (jpegError) {
         console.error('❌ Failed to reconstruct JPEG for verification:', jpegError);
         return { verified: false, error: 'Failed to process JPEG for verification.' };
