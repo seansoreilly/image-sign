@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Return the signed image
-    return new NextResponse(signedImageBuffer, {
+    return new NextResponse(signedImageBuffer as BodyInit, {
       status: 200,
       headers: {
         'Content-Type': file.type,
