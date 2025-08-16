@@ -11,6 +11,7 @@ interface RequiredEnvVars {
   SIGNING_PUBLIC_KEY: string
   NEXTAUTH_URL?: string
   ENCRYPTION_SECRET?: string
+  NEXT_PUBLIC_GA_ID?: string
 }
 
 class EnvironmentError extends Error {
